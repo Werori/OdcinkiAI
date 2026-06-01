@@ -9,7 +9,7 @@ class DataGenerator:
     def __init__(self, root_dir: str = "Dataset", split_ratio: float = 0.8):
         self.root_dir = root_dir
         self.split_ratio = split_ratio
-        self.resolutions = [(640, 480), (320, 240), (160, 120)]
+        self.resolution = (640, 480)
         self.white = 255
         self.train_images_path = os.path.join(root_dir, "TrainingData", "images")
         self.train_labels_path = os.path.join(root_dir, "TrainingData", "labels")
@@ -44,7 +44,7 @@ class DataGenerator:
         return (class_id, x_center_norm, y_center_norm, box_width_norm, box_height_norm)
 
     def _add_salt(self, image: np.ndarray, count: int) -> np.ndarray:
-        height, width ,_ = image.shape
+        height, width, _ = image.shape
         for _ in range(count):
             y = random.randint(0, height - 1)
             x = random.randint(0, width - 1)
@@ -58,7 +58,6 @@ class DataGenerator:
             x = random.randint(0, width - 1)
             image[y, x] = [0, 0, 0]
         return image
-
 
     def add_salt_and_pepper_noise(
         self, image: np.ndarray, amount: float = 0.01
@@ -74,15 +73,10 @@ class DataGenerator:
         noisy_image = self._add_pepper(noisy_image, num_pepper)
         return noisy_image
 
-
     def build_dataset(self, number_of_images: int, max_lines: int):
         for i in range(number_of_images):
-            random_resolution = self.resolutions[
-                random.randint(0, len(self.resolutions) - 1)
-            ]
-
             img = np.full(
-                (random_resolution[1], random_resolution[0], 3),
+                (self.resolution[1], self.resolution[0], 3),
                 self.white,
                 dtype=np.uint8,
             )
@@ -90,10 +84,10 @@ class DataGenerator:
             image_labels = []
 
             for _ in range(number_of_lines):
-                x1 = random.randint(0, random_resolution[0] - 1)
-                x2 = random.randint(0, random_resolution[0] - 1)
-                y1 = random.randint(0, random_resolution[1] - 1)
-                y2 = random.randint(0, random_resolution[1] - 1)
+                x1 = random.randint(0, self.resolution[0] - 1)
+                x2 = random.randint(0, self.resolution[0] - 1)
+                y1 = random.randint(0, self.resolution[1] - 1)
+                y2 = random.randint(0, self.resolution[1] - 1)
 
                 thickness = random.randint(1, 5)
                 cv2.line(img, (x1, y1), (x2, y2), (0, 0, 0), thickness)
