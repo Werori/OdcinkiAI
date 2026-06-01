@@ -84,16 +84,19 @@ class DataGenerator:
             image_labels = []
 
             for _ in range(number_of_lines):
-                x1 = random.randint(0, self.resolution[0] - 1)
-                x2 = random.randint(0, self.resolution[0] - 1)
-                y1 = random.randint(0, self.resolution[1] - 1)
-                y2 = random.randint(0, self.resolution[1] - 1)
+                x1 = random.randint(50, self.resolution[0] - 50)
+                y1 = random.randint(50, self.resolution[1] - 50)
 
-                thickness = random.randint(1, 5)
+                dx = random.randint(40, 90)
+                dy = random.randint(40, 90)
+
+                x2 = x1 + dx
+                y2 = y1 + dy
+
+                thickness = random.randint(4, 8)
                 cv2.line(img, (x1, y1), (x2, y2), (0, 0, 0), thickness)
-
                 class_id, x_center, y_center, box_w, box_h = (
-                    self.generate_data_for_labels(0, x1, x2, y1, y2, random_resolution)
+                    self.generate_data_for_labels(0, x1, x2, y1, y2, self.resolution)
                 )
 
                 yolo_line = (
@@ -101,7 +104,7 @@ class DataGenerator:
                 )
                 image_labels.append(yolo_line)
 
-            img = self.add_salt_and_pepper_noise(img, amount=0.01)
+            img = self.add_salt_and_pepper_noise(img, amount=0.003)
             base_filename = f"line{i}_{number_of_lines}"
 
             if random.random() < self.split_ratio:

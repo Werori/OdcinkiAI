@@ -1,0 +1,6 @@
+path: C:\Users\werri\Desktop\odcinkiAI\Dataset
+train: TrainingData/images
+val: ValidationData/images
+
+names:
+  0: linia
