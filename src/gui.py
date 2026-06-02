@@ -47,15 +47,6 @@ class YOLOApp(ctk.CTk):
         )
         self.btn_load.pack(padx=20, pady=10)
 
-        self.conf_label = ctk.CTkLabel(self.sidebar, text="Próg Pewności (Conf): 0.30")
-        self.conf_label.pack(padx=20, pady=(20, 0))
-
-        self.slider_conf = ctk.CTkSlider(
-            self.sidebar, from_=5, to=100, command=self.update_conf
-        )
-        self.slider_conf.set(30)
-        self.slider_conf.pack(padx=20, pady=5)
-
         self.btn_detect = ctk.CTkButton(
             self.sidebar,
             text="URUCHOM DETEKCJĘ",
@@ -108,10 +99,6 @@ class YOLOApp(ctk.CTk):
         )
         self.lbl_time.pack(side="right", padx=20, pady=10)
 
-    def update_conf(self, value):
-        conf_float = float(value) / 100.0
-        self.conf_label.configure(text=f"Próg Pewności (Conf): {conf_float:.2f}")
-
     def load_image(self):
         file_path = filedialog.askopenfilename(
             filetypes=[("Obrazy", "*.png *.jpg *.jpeg *.bmp")]
@@ -119,6 +106,14 @@ class YOLOApp(ctk.CTk):
 
         if file_path:
             self.current_image_path = file_path
+
+            # --- POPRAWKA 1: Wyciągamy prawdziwą liczbę linii z nazwy pliku ---
+            filename = os.path.basename(file_path) # np. "line66_9.png"
+            try:
+                # Wyciągamy to, co jest między "_" a "."
+                self.true_count = filename.split("_")[1].split(".")[0]
+            except IndexError:
+                self.true_count = "?" # Jeśli plik nie ma standardowej nazwy
 
             pil_img = Image.open(file_path)
 
@@ -128,9 +123,11 @@ class YOLOApp(ctk.CTk):
 
             self.lbl_orig.configure(image=self.img_orig_ref, text="")
 
-            # POPRAWKA: Usuwamy image=None, resetujemy sam tekst
-            self.lbl_res.configure(text="[ Oczekiwanie na detekcję ]")
-            self.lbl_counter.configure(text="Wykryto odcinków: --")
+            # --- POPRAWKA 2: Całkowite czyszczenie prawego panelu ---
+            self.lbl_res.configure(image="", text="[ Oczekiwanie na detekcję ]")
+            
+            # Resetujemy dolny pasek, pokazując już prawdziwą liczbę linii z pliku
+            self.lbl_counter.configure(text=f"Wykryto: --  |  Prawdziwe: {self.true_count}", text_color="white")
             self.lbl_time.configure(text="Czas operacji: -- ms")
 
     def run_detection(self):
@@ -142,29 +139,37 @@ class YOLOApp(ctk.CTk):
             self.lbl_res.configure(text="[ Błąd: Brak modelu best.pt! ]")
             return
 
-        current_conf = float(self.slider_conf.get()) / 100.0
-
         start_time = time.time()
-
-        results = self.model(self.current_image_path, conf=current_conf, verbose=False)
-
+        results = self.model(self.current_image_path, conf=0.3, verbose=False)
         end_time = time.time()
         elapsed_time_ms = int((end_time - start_time) * 1000)
 
         predicted_count = len(results[0].boxes)
 
-        bgr_array = results[0].plot()
+        # Rysowanie ramek (wyłączamy napisy klas i conf, żeby obrazek był czysty)
+        bgr_array = results[0].plot(labels=False, conf=False)
         rgb_array = bgr_array[:, :, ::-1]
 
         pil_res_img = Image.fromarray(rgb_array)
 
-        # POPRAWKA: Przypisujemy referencję do self.img_res_ref, aby Python nie czyścił jej z pamięci RAM
         self.img_res_ref = ctk.CTkImage(
             light_image=pil_res_img, dark_image=pil_res_img, size=(350, 350)
         )
         self.lbl_res.configure(image=self.img_res_ref, text="")
 
-        self.lbl_counter.configure(text=f"Wykryto odcinków: {predicted_count}")
+        # --- POPRAWKA 1 cd: Porównanie wyników i kolorowy status ---
+        if self.true_count != "?":
+            if int(predicted_count) == int(self.true_count):
+                status_text = f"Wykryto: {predicted_count}  |  Prawdziwe: {self.true_count}  [OK]"
+                text_color = "green"
+            else:
+                status_text = f"Wykryto: {predicted_count}  |  Prawdziwe: {self.true_count}  [BŁĄD]"
+                text_color = "red"
+        else:
+            status_text = f"Wykryto odcinków: {predicted_count}"
+            text_color = "white"
+
+        self.lbl_counter.configure(text=status_text, text_color=text_color)
         self.lbl_time.configure(text=f"Czas operacji: {elapsed_time_ms} ms")
 
 
