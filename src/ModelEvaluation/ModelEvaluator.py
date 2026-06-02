@@ -44,7 +44,7 @@ class ModelEvaluator:
             print(
                 f"Ostrzeżenie: Nie znaleziono {trained_model_path}. Testuję na domyślnym modelu!"
             )
-        print("\n--- ROZPOCZYNAMY WALIDACJĘ (Test na ukrytych danych) ---")
+        print("\n--- ROZPOCZĘCIE WALIDACJI ---")
 
         val_images_route = os.path.join(
             self.dataset_dir, "ValidationData", "images", "*.png"
