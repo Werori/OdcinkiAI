@@ -1,5 +1,4 @@
 import os
-import time
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -30,18 +29,17 @@ class YOLOApp(ctk.CTk):
         self.create_status_bar()
 
     def setup_main_window(self):
-        self.title("Detektor Odcinków - YOLO v11")
+        self.title("Detektor Odcinków")
         self.geometry("1000x650")
 
     def create_sidebar(self):
         self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)
 
-        self.title_label = ctk.CTkLabel(
-            self.sidebar, text="MENU", font=ctk.CTkFont(size=20, weight="bold")
-        )
-        self.title_label.pack(padx=20, pady=20)
+        self._create_sidebar_title()
+        self._create_sidebar_buttons()
 
+    def _create_sidebar_buttons(self):
         self.btn_load = ctk.CTkButton(
             self.sidebar, text="Wczytaj Obraz", command=self.load_image
         )
@@ -55,6 +53,12 @@ class YOLOApp(ctk.CTk):
             command=self.run_detection,
         )
         self.btn_detect.pack(padx=20, pady=30)
+
+    def _create_sidebar_title(self):
+        self.title_label = ctk.CTkLabel(
+            self.sidebar, text="MENU", font=ctk.CTkFont(size=20, weight="bold")
+        )
+        self.title_label.pack(padx=20, pady=20)
 
     def create_main_panel(self):
         self.main_panel = ctk.CTkFrame(self)
@@ -89,15 +93,10 @@ class YOLOApp(ctk.CTk):
 
         self.lbl_counter = ctk.CTkLabel(
             self.status_panel,
-            text="Wykryto odcinków: --",
+            text="Wykryte odcinki: ",
             font=ctk.CTkFont(size=16, weight="bold"),
         )
         self.lbl_counter.pack(side="left", padx=20, pady=10)
-
-        self.lbl_time = ctk.CTkLabel(
-            self.status_panel, text="Czas operacji: -- ms", font=ctk.CTkFont(size=14)
-        )
-        self.lbl_time.pack(side="right", padx=20, pady=10)
 
     def load_image(self):
         file_path = filedialog.askopenfilename(
@@ -107,13 +106,11 @@ class YOLOApp(ctk.CTk):
         if file_path:
             self.current_image_path = file_path
 
-            # --- POPRAWKA 1: Wyciągamy prawdziwą liczbę linii z nazwy pliku ---
-            filename = os.path.basename(file_path) # np. "line66_9.png"
+            filename = os.path.basename(file_path)
             try:
-                # Wyciągamy to, co jest między "_" a "."
                 self.true_count = filename.split("_")[1].split(".")[0]
             except IndexError:
-                self.true_count = "?" # Jeśli plik nie ma standardowej nazwy
+                self.true_count = "?"
 
             pil_img = Image.open(file_path)
 
@@ -123,12 +120,11 @@ class YOLOApp(ctk.CTk):
 
             self.lbl_orig.configure(image=self.img_orig_ref, text="")
 
-            # --- POPRAWKA 2: Całkowite czyszczenie prawego panelu ---
             self.lbl_res.configure(image="", text="[ Oczekiwanie na detekcję ]")
-            
-            # Resetujemy dolny pasek, pokazując już prawdziwą liczbę linii z pliku
-            self.lbl_counter.configure(text=f"Wykryto: --  |  Prawdziwe: {self.true_count}", text_color="white")
-            self.lbl_time.configure(text="Czas operacji: -- ms")
+
+            self.lbl_counter.configure(
+                text=f"Wykryto: --  |  Prawdziwe: {self.true_count}", text_color="white"
+            )
 
     def run_detection(self):
         if not self.current_image_path:
@@ -139,17 +135,30 @@ class YOLOApp(ctk.CTk):
             self.lbl_res.configure(text="[ Błąd: Brak modelu best.pt! ]")
             return
 
-        start_time = time.time()
         results = self.model(self.current_image_path, conf=0.3, verbose=False)
-        end_time = time.time()
-        elapsed_time_ms = int((end_time - start_time) * 1000)
 
         predicted_count = len(results[0].boxes)
+        conf_text = self._calculate_average_confidence(results, predicted_count)
 
-        # Rysowanie ramek (wyłączamy napisy klas i conf, żeby obrazek był czysty)
-        bgr_array = results[0].plot(labels=False, conf=False)
+        bgr_array = results[0].plot()
         rgb_array = bgr_array[:, :, ::-1]
 
+        self._display_result_image(rgb_array)
+
+        if self.true_count != "?":
+            if int(predicted_count) == int(self.true_count):
+                status_text = f"Wykryto: {predicted_count}  |  Prawdziwe: {self.true_count}  [OK]{conf_text}"
+                text_color = "green"
+            else:
+                status_text = f"Wykryto: {predicted_count}  |  Prawdziwe: {self.true_count}  [BŁĄD]{conf_text}"
+                text_color = "red"
+        else:
+            status_text = f"Wykryte odcinki: {predicted_count}"
+            text_color = "white"
+
+        self.lbl_counter.configure(text=status_text, text_color=text_color)
+
+    def _display_result_image(self, rgb_array):
         pil_res_img = Image.fromarray(rgb_array)
 
         self.img_res_ref = ctk.CTkImage(
@@ -157,20 +166,13 @@ class YOLOApp(ctk.CTk):
         )
         self.lbl_res.configure(image=self.img_res_ref, text="")
 
-        # --- POPRAWKA 1 cd: Porównanie wyników i kolorowy status ---
-        if self.true_count != "?":
-            if int(predicted_count) == int(self.true_count):
-                status_text = f"Wykryto: {predicted_count}  |  Prawdziwe: {self.true_count}  [OK]"
-                text_color = "green"
-            else:
-                status_text = f"Wykryto: {predicted_count}  |  Prawdziwe: {self.true_count}  [BŁĄD]"
-                text_color = "red"
+    def _calculate_average_confidence(self, results, predicted_count) -> str:
+        if predicted_count > 0:
+            confidences = results[0].boxes.conf.cpu().numpy()
+            avg_conf = (sum(confidences) / predicted_count) * 100
+            return f"  |  Śr. pewność dla wszystkich linii na obrazie: {avg_conf:.1f}%"
         else:
-            status_text = f"Wykryto odcinków: {predicted_count}"
-            text_color = "white"
-
-        self.lbl_counter.configure(text=status_text, text_color=text_color)
-        self.lbl_time.configure(text=f"Czas operacji: {elapsed_time_ms} ms")
+            return "  |  Śr. pewność dla wszystkich linii na obrazie: 0%"
 
 
 if __name__ == "__main__":
